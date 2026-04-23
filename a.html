@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Quiz Application</title>
+    <style>
+        /* --- CSS STYLING --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .quiz-card {
+            background: #ffffff;
+            width: 100%;
+            max-width: 500px;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            transition: all 0.5s ease;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            height: 10px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, #00dbde, #fc00ff);
+            transition: width 0.4s ease;
+        }
+
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            color: #636e72;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .question-text {
+            font-size: 22px;
+            color: #2d3436;
+            margin-bottom: 25px;
+            line-height: 1.4;
+            font-weight: 700;
+        }
+
+        /* Options list */
+        .options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .option {
+            padding: 15px 20px;
+            border: 2px solid #f1f2f6;
+            border-radius: 12px;
+            cursor: pointer;
+            background: #fff;
+            font-size: 16px;
+            font-weight: 500;
+            text-align: left;
+            transition: all 0.2s ease;
+        }
+
+        .option:hover {
+            border-color: #6c5ce7;
+            background: #f8f7ff;
+        }
+
+        /* Logic feedback classes */
+        .correct-anim {
+            background-color: #dcfce7 !important;
+            border-color: #22c55e !important;
+            color: #166534 !important;
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+        }
+
+        .wrong-anim {
+            background-color: #fee2e2 !important;
+            border-color: #ef4444 !important;
+            color: #991b1b !important;
+            animation: shake 0.4s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
+        }
+
+        /* Action Button */
+        .next-btn {
+            width: 100%;
+            margin-top: 25px;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            background: #6c5ce7;
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            display: none; /* Hidden until selection */
+            transition: background 0.3s;
+        }
+
+        .next-btn:hover {
+            background: #5b4bc4;
+        }
+
+        /* Thank You Screen */
+        .result-screen {
+            display: none;
+            text-align: center;
+        }
+
+        .score-display {
+            font-size: 50px;
+            font-weight: 800;
+            color: #6c5ce7;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="quiz-card" id="main-container">
+        <div class="progress-container">
+            <div class="progress-fill" id="progress-bar"></div>
+        </div>
+
+        <div id="quiz-ui">
+            <div class="status-header">
+                <span id="q-counter">Question 1 of 6</span>
+            </div>
+            <h2 class="question-text" id="question-label">Loading question...</h2>
+            <div class="options-list" id="options-container">
+                </div>
+            <button class="next-btn" id="next-button" onclick="goToNext()">Next Question</button>
+        </div>
+
+        <div class="result-screen" id="result-ui">
+            <h1 style="color: #22c55e;">🎉 Congratulations!</h1>
+            <p style="margin-top: 10px;">You've completed the challenge.</p>
+            <div class="score-display" id="final-score">0 / 6</div>
+            <p style="color: #636e72; margin-bottom: 25px;">Thank you for playing!</p>
+            <button class="option" style="width: 100%; text-align: center; background: #f1f2f6;" onclick="location.reload()">Restart Quiz</button>
+        </div>
+    </div>
+
+    <script>
+        // Proper Quiz Data
+        const quizData = [
+            { q: "Which language is used for web structure?", a: ["Python", "HTML", "Java", "C++"], correct: 1 },
+            { q: "What does CSS stand for?", a: ["Creative Style System", "Computer Style Sheet", "Cascading Style Sheets", "Colorful Style Sheet"], correct: 2 },
+            { q: "Which company developed React.js?", a: ["Google", "Microsoft", "Facebook", "Twitter"], correct: 2 },
+            { q: "Which symbol is used for jQuery?", a: ["&", "#", "$", "@"], correct: 2 },
+            { q: "How do you add a background color in CSS?", a: ["color:", "bg:", "background-color:", "fill:"], correct: 2 },
+            { q: "Which HTML tag is used for JavaScript?", a: ["<js>", "<scripting>", "<script>", "<javascript>"], correct: 2 }
+        ];
+
+        let currentPos = 0;
+        let userScore = 0;
+
+        function renderQuestion() {
+            const data = quizData[currentPos];
+            document.getElementById("question-label").innerText = data.q;
+            document.getElementById("q-counter").innerText = `Question ${currentPos + 1} of ${quizData.length}`;
+            document.getElementById("progress-bar").style.width = ((currentPos + 1) / quizData.length * 100) + "%";
+            
+            const optionsBox = document.getElementById("options-container");
+            optionsBox.innerHTML = "";
+            
+            data.a.forEach((option, index) => {
+                const btn = document.createElement("button");
+                btn.className = "option";
+                btn.innerText = option;
+                btn.onclick = () => validateAnswer(btn, index);
+                optionsBox.appendChild(btn);
+            });
+
+            document.getElementById("next-button").style.display = "none";
+        }
+
+        function validateAnswer(selectedBtn, index) {
+            const correctIdx = quizData[currentPos].correct;
+            const allBtns = document.querySelectorAll(".option");
+
+            // Stop multiple clicks
+            allBtns.forEach(b => b.style.pointerEvents = "none");
+
+            if (index === correctIdx) {
+                selectedBtn.classList.add("correct-anim");
+                userScore++;
+            } else {
+                selectedBtn.classList.add("wrong-anim");
+                allBtns[correctIdx].classList.add("correct-anim"); // Show correct answer
+            }
+
+            document.getElementById("next-button").style.display = "block";
+        }
+
+        function goToNext() {
+            currentPos++;
+            if (currentPos < quizData.length) {
+                renderQuestion();
+            } else {
+                showFinalResults();
+            }
+        }
+
+        function showFinalResults() {
+            document.getElementById("quiz-ui").style.display = "none";
+            document.getElementById("result-ui").style.display = "block";
+            document.getElementById("final-score").innerText = `${userScore} / ${quizData.length}`;
+        }
+
+        // Initialize
+        renderQuestion();
+    </script>
+</body>
+</html>
